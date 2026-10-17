@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Predict | AI Tiering Orchestrator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <h1>Cloud Predict</h1>
+                <p>AI-Driven Hybrid Storage Orchestrator</p>
+            </div>
+            <div style="display: flex; gap: 1.5rem; align-items: center;">
+                <button onclick="triggerEngine()" style="background: linear-gradient(135deg, var(--accent-hot), var(--accent-cold)); border: none; padding: 0.5rem 1rem; border-radius: 8px; color: #fff; font-weight: 600; cursor: pointer; transition: transform 0.2s;">⚡ Trigger ML Engine</button>
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    XGBoost Engine Active
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Top Stats -->
+            <div class="card stat-card">
+                <h2>Expected Value Savings</h2>
+                <div class="metric-value savings" id="val-savings">$0.00</div>
+                <div class="metric-subtitle">Cost reduction via AI routing</div>
+            </div>
+            
+            <div class="card stat-card">
+                <h2>Total Files Analyzed</h2>
+                <div class="metric-value" id="val-files">0</div>
+                <div class="metric-subtitle">Tracked in SQLite WAL</div>
+            </div>
+            
+            <div class="card stat-card">
+                <h2>Hot Tier Size</h2>
+                <div class="metric-value hot" id="val-hot-gb">0.0 GB</div>
+                <div class="metric-subtitle">Fast NVMe Storage</div>
+            </div>
+            
+            <div class="card stat-card">
+                <h2>Cold Tier Size</h2>
+                <div class="metric-value cold" id="val-cold-gb">0.0 GB</div>
+                <div class="metric-subtitle">S3 Glacier Deep Archive</div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card chart-card">
+                <h2>Storage Distribution Architecture</h2>
+                <div style="position: relative; height: 320px; width: 100%;">
+                    <canvas id="tierChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Files -->
+            <div class="card files-card">
+                <h2>Recent AI Decisions</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>File ID</th>
+                            <th>Size</th>
+                            <th>Tier</th>
+                        </tr>
+                    </thead>
+                    <tbody id="files-table-body">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let chartInstance = null;
+        
+        const initChart = (hotGb, coldGb) => {
+            const ctx = document.getElementById('tierChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Hot Tier', 'Cold Tier'],
+                    datasets: [{
+                        data: [hotGb, coldGb],
+                        backgroundColor: ['#ff3366', '#00f0ff'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#8a91a6', padding: 20 } }
+                    }
+                }
+            });
+        };
+
+        const updateData = async () => {
+            try {
+                const res = await fetch('/api/v1/stats');
+                const data = await res.json();
+                
+                // Animate Numbers (basic assignment for now)
+                document.getElementById('val-savings').innerText = '$' + data.savings_usd.toFixed(2);
+                document.getElementById('val-files').innerText = data.total_files.toLocaleString();
+                document.getElementById('val-hot-gb').innerText = data.hot_gb.toFixed(2) + ' GB';
+                document.getElementById('val-cold-gb').innerText = data.cold_gb.toFixed(2) + ' GB';
+                
+                // Update Chart
+                if (!chartInstance) {
+                    initChart(data.hot_gb, data.cold_gb);
+                } else {
+                    chartInstance.data.datasets[0].data = [data.hot_gb, data.cold_gb];
+                    chartInstance.update();
+                }
+
+                // Populate Table
+                const tbody = document.getElementById('files-table-body');
+                tbody.innerHTML = '';
+                data.recent_files.forEach(f => {
+                    const sizeMb = (f.size_bytes / (1024*1024)).toFixed(1);
+                    const row = `<tr>
+                        <td style="font-family: monospace; color: var(--text-primary)">${f.id.substring(0,16)}...</td>
+                        <td>${sizeMb} MB</td>
+                        <td><span class="badge ${f.tier}">${f.tier}</span></td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+
+            } catch (e) {
+                console.error("Stats fetch failed", e);
+            }
+        };
+
+        // Initial Load and Polling
+        updateData();
+        setInterval(updateData, 5000);
+
+        async function triggerEngine() {
+            try {
+                await fetch('/api/v1/trigger-evaluation', { method: 'POST' });
+                alert("ML Evaluation Cycle Triggered! Watch the charts update as files are migrated.");
+            } catch(e) {
+                console.error("Trigger failed", e);
+            }
+        }
+    </script>
+</body>
+</html>

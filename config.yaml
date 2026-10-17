@@ -1,0 +1,16 @@
+storage:
+  endpoint_url: "http://localhost:9000"
+  access_key: "admin"
+  secret_key: "password"
+  hot_bucket: "hot-tier-bucket"
+  cold_bucket: "cold-tier-bucket"
+
+pricing:
+  hot_storage_per_gb_month: 0.023
+  cold_storage_per_gb_month: 0.004
+  egress_per_gb: 0.09
+  latency_penalty_fixed: 0.01
+  min_cold_duration_days: 90
+
+ml:
+  horizon_days: 14
